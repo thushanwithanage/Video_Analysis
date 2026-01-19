@@ -1,0 +1,1 @@
+Machine learning pipeline to automatically identify commercial segments in short-form videos. Extracted frames, engineered pixel and histogram-based features, and trained an EfficientNetB0-based classifier using Python and TensorFlow.
