@@ -1,4 +1,4 @@
-# 🚀 Machine Learning Model Development & Testing (ML Engineer Focus)
+# 🚀 Machine Learning Model Development & Testing
 
 ## Overview
 This repository showcases an end-to-end machine learning pipeline, covering data preprocessing, model development, evaluation, and testing using Python.  
