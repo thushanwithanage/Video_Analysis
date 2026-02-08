@@ -1,0 +1,98 @@
+import cv2
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.preprocessing.image import img_to_array
+from tensorflow.keras.applications.efficientnet import preprocess_input
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+VIDEO_PATH = "C:/Users/kalha/Downloads/MSC@DBS/Research/Videos/3.mp4"
+MODEL_PATH = "promo_classifier_final.h5"
+
+AD_START_SEC = 290
+AD_END_SEC   = 302
+
+# Class labels mapping
+CLASS_NAMES = ["Main", "Ad"]
+IMG_SIZE = (224, 224)
+
+print(f"Loading model from {MODEL_PATH}...")
+model = tf.keras.models.load_model(MODEL_PATH)
+print("Model loaded successfully.\n")
+
+cap = cv2.VideoCapture(VIDEO_PATH)
+if not cap.isOpened():
+    raise RuntimeError(f"Error: Could not open video {VIDEO_PATH}")
+
+fps = cap.get(cv2.CAP_PROP_FPS)
+total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+video_duration = int(total_frames / fps)
+
+print(f"--- Processing Video ---")
+print(f"FPS: {fps} | Total Duration: {video_duration} seconds")
+print("-" * 30)
+
+y_true = []
+y_pred = []
+
+for sec in range(video_duration):
+    
+    cap.set(cv2.CAP_PROP_POS_MSEC, sec * 1000)
+    ret, frame = cap.read()
+    
+    if not ret:
+        break
+
+    # 1. Preprocess Frame
+    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    resized = cv2.resize(frame_rgb, IMG_SIZE)
+    arr = img_to_array(resized)
+    arr = preprocess_input(arr)        
+    arr = np.expand_dims(arr, axis=0)  
+
+    # 2. Predict
+    probs = model.predict(arr, verbose=0)
+    predicted_class = np.argmax(probs) 
+    confidence = np.max(probs)
+
+    # 3. Determine Ground Truth
+    if AD_START_SEC <= sec <= AD_END_SEC:
+        true_label = 1  # Ad
+    else:
+        true_label = 0  # Main
+
+    # 4. Store Results
+    y_true.append(true_label)
+    y_pred.append(predicted_class)
+
+    print(f"Second {sec}: Actual: {CLASS_NAMES[true_label]}, Predicted: {CLASS_NAMES[predicted_class]} ({confidence:.2%})")
+
+    actual_txt = f"Actual: {CLASS_NAMES[true_label]}"
+    pred_txt   = f"Pred: {CLASS_NAMES[predicted_class]}"
+    
+    color = (0, 255, 0) if predicted_class == true_label else (0, 0, 255)
+
+    cv2.putText(frame, actual_txt, (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+    cv2.putText(frame, pred_txt, (30, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+    cv2.imshow("Ad Detection Stream", frame)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
+
+print("\n" + "="*40)
+print("        FINAL EVALUATION RESULTS        ")
+print("="*40)
+
+if len(y_true) > 0:
+    print(f"Overall Accuracy: {accuracy_score(y_true, y_pred):.4f}")
+    print("\nClassification Report:")
+    print(classification_report(y_true, y_pred, target_names=CLASS_NAMES, digits=4))
+    
+    cm = confusion_matrix(y_true, y_pred)
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=CLASS_NAMES, yticklabels=CLASS_NAMES)
+    plt.title("Confusion Matrix")
+    plt.show()
